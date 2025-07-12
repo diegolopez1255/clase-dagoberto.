@@ -1,0 +1,107 @@
+import mysql.connector
+from mysql.connector import Error
+import os
+CONTRASEÑA="yodld"
+peliculas = []
+
+def borrarPantalla():
+    os.system("cls" if os.name == "nt" else "clear")
+
+def esperarTecla():
+    input("\nPresiona Enter para continuar...")
+
+def CrearPeliculas():
+    borrarPantalla()
+    print("\n\t.:: Alta de películas ::.\n")
+
+    peliculas["nombre"] = input("Ingresa el nombre: ").upper().strip()
+    peliculas["categoria"] = input("Ingresa la Categoría: ").upper().strip()
+    peliculas["clasificacion"] = input("Ingresa la Clasificación: ").upper().strip()
+    peliculas["genero"] = input("Ingresa el Género: ").upper().strip()
+    peliculas["idioma"] = input("Ingresa el Idioma: ").upper().strip()
+
+    conexion = conectar()
+    if conexion is None:
+        print("No se pudo conectar a la base de datos.")
+        return
+
+    cursor = conexion.cursor()
+    try:
+        sql = "INSERT INTO peliculas (id, nombre, categoria, clasificacion, genero, idioma) VALUES (NULL, %s, %s, %s, %s, %s)"
+        valores = (
+            peliculas["nombre"],
+            peliculas["categoria"],
+            peliculas["clasificacion"],
+            peliculas["genero"],
+            peliculas["idioma"]
+        )
+        cursor.execute(sql, valores)
+        conexion.commit()
+        print("\n\t\t ::: ¡LA OPERACIÓN SE REALIZÓ CON ÉXITO! :::")
+    except Exception as e:
+        print(f"\n\t❌ Error al insertar en la base de datos: {e}")
+    finally:
+        cursor.close()
+        conexion.close()
+
+    esperarTecla()
+
+def conectar():
+       try:
+         conexion=mysql.connector.connect(
+         host="127.0.0.1",
+         user="root",
+         password="",
+         database="bd_peliculas"
+      )
+         return conexion
+       except Error as e:
+        print(f"El error que sucedio es: {e}")
+        return None
+
+def eliminarPeliculas():
+    clave=input("Ingresa una contraseña: ")
+    if clave !=CONTRASEÑA:
+        print("!Contraseña invalida!")
+        return
+    nombre = input("Ingresa el nombre de la película a eliminar: ").strip()
+    if nombre in peliculas:
+        peliculas.remove(nombre)
+        print(f"'{nombre}' fue eliminada.")
+    else:
+        print(" La película no se encontró.")
+
+def modificarPeliculas():
+    consultarPeliculas()
+    nombre = input("Ingresa el nombre de la película que quieres modificar: ").strip()
+    if nombre in peliculas:
+        nuevo = input("Ingresa el nuevo nombre: ").strip()
+        index = peliculas.index(nombre)
+        peliculas[index] = nuevo
+        print(f" '{nombre}' fue modificada a '{nuevo}'.")
+    else:
+        print(" La película no se encontró.")
+
+def consultarPeliculas():
+    print("\n Lista de películas:")
+    if peliculas:
+        for i, peli in enumerate(peliculas, start=1):
+            print(f"{i}. {peli}")
+    else:
+        print("No hay películas registradas.")
+
+def buscarPeliculas():
+    nombre = input("Ingresa el nombre de la película a buscar: ").strip()
+    if nombre in peliculas:
+        print(f" '{nombre}' sí está registrada.")
+    else:
+        print(" La película no se encontró.")
+
+def vaciarPeliculas():
+    clave=input("Ingresa una contraseña: ")
+    if clave !=CONTRASEÑA:
+        print("!Contraseña invalida!")
+        return
+    peliculas.clear()
+    print(" Lista vacía. Todas las películas fueron eliminadas.")
+    resp=input("Deseas quitar todas las peliculas del sistema? (si/no)").lower().strip()
