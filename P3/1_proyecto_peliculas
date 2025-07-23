@@ -1,0 +1,276 @@
+import mysql.connector
+from mysql.connector import Error
+import os
+
+# Configuración global
+CONTRASENA_ADMIN = "diego01"
+DB_CONFIG = {
+    "host": "127.0.0.1",
+    "user": "root",
+    "password": "",
+    "database": "bd_peliculas"
+}
+
+def borrar_pantalla():
+    """Limpia la pantalla de la consola"""
+    os.system("cls" if os.name == "nt" else "clear")
+
+def esperar_tecla():
+    """Pausa la ejecución hasta que el usuario presione una tecla"""
+    input("\nPresione cualquier tecla para continuar...")
+
+def conectar_bd():
+    """Establece conexión con la base de datos"""
+    try:
+        conexion = mysql.connector.connect(**DB_CONFIG)
+        return conexion
+    except Error as e:
+        print(f"Error de conexión: {e}")
+        return None
+
+def validar_entrada(texto, longitud_min=1):
+    """Valida que la entrada no esté vacía"""
+    while True:
+        entrada = input(texto).strip()
+        if len(entrada) >= longitud_min:
+            return entrada.upper()
+        print(f"Error: La entrada debe tener al menos {longitud_min} caracteres")
+
+def crear_pelicula():
+    """Registra una nueva película en la base de datos"""
+    borrar_pantalla()
+    print("\n\t.:: CREAR NUEVA PELÍCULA ::.\n")
+    
+    conexion = conectar_bd()
+    if conexion is None:
+        esperar_tecla()
+        return
+    
+    try:
+        pelicula = {
+            "nombre": validar_entrada("Ingrese el nombre: "),
+            "categoria": validar_entrada("Ingrese la categoría: "),
+            "clasificacion": validar_entrada("Ingrese la clasificación: "),
+            "genero": validar_entrada("Ingrese el género: "),
+            "idioma": validar_entrada("Ingrese el idioma: ")
+        }
+        
+        cursor = conexion.cursor()
+        sql = """INSERT INTO peliculas 
+                (nombre, categoria, clasificacion, genero, idioma) 
+                VALUES (%s, %s, %s, %s, %s)"""
+        valores = (pelicula["nombre"], pelicula["categoria"], 
+                  pelicula["clasificacion"], pelicula["genero"], 
+                  pelicula["idioma"])
+        
+        cursor.execute(sql, valores)
+        conexion.commit()
+        print("\n\t¡PELÍCULA REGISTRADA CON ÉXITO!")
+        
+    except Error as e:
+        print(f"\nError al crear película: {e}")
+    finally:
+        if conexion.is_connected():
+            cursor.close()
+            conexion.close()
+    
+    esperar_tecla()
+
+def mostrar_peliculas():
+    """Muestra todas las películas registradas"""
+    borrar_pantalla()
+    print("\n\t.:: LISTADO DE PELÍCULAS ::.\n")
+    
+    conexion = conectar_bd()
+    if conexion is None:
+        esperar_tecla()
+        return
+    
+    try:
+        cursor = conexion.cursor(dictionary=True)
+        cursor.execute("SELECT * FROM peliculas")
+        peliculas = cursor.fetchall()
+        
+        if peliculas:
+            print(f"{'ID':<5}{'NOMBRE':<20}{'CATEGORÍA':<15}{'CLASIFICACIÓN':<15}{'GÉNERO':<15}{'IDIOMA':<10}")
+            print("-"*80)
+            for peli in peliculas:
+                print(f"{peli['id']:<5}{peli['nombre']:<20}{peli['categoria']:<15}"
+                      f"{peli['clasificacion']:<15}{peli['genero']:<15}{peli['idioma']:<10}")
+            print("-"*80)
+            print(f"Total: {len(peliculas)} películas")
+        else:
+            print("\nNo hay películas registradas en el sistema")
+            
+    except Error as e:
+        print(f"\nError al obtener películas: {e}")
+    finally:
+        if conexion.is_connected():
+            cursor.close()
+            conexion.close()
+    
+    esperar_tecla()
+
+def buscar_pelicula():
+    """Busca películas por nombre"""
+    borrar_pantalla()
+    print("\n\t.:: BUSCAR PELÍCULA ::.\n")
+    
+    nombre = validar_entrada("Ingrese el nombre a buscar: ", 3)
+    conexion = conectar_bd()
+    if conexion is None:
+        esperar_tecla()
+        return
+    
+    try:
+        cursor = conexion.cursor(dictionary=True)
+        sql = "SELECT * FROM peliculas WHERE nombre LIKE %s"
+        cursor.execute(sql, (f"%{nombre}%",))
+        resultados = cursor.fetchall()
+        
+        if resultados:
+            print("\nResultados de búsqueda:")
+            print(f"{'ID':<5}{'NOMBRE':<20}{'CATEGORÍA':<15}{'CLASIFICACIÓN':<15}")
+            print("-"*60)
+            for peli in resultados:
+                print(f"{peli['id']:<5}{peli['nombre']:<20}{peli['categoria']:<15}{peli['clasificacion']:<15}")
+            print(f"\nSe encontraron {len(resultados)} películas")
+        else:
+            print("\nNo se encontraron películas con ese nombre")
+            
+    except Error as e:
+        print(f"\nError en la búsqueda: {e}")
+    finally:
+        if conexion.is_connected():
+            cursor.close()
+            conexion.close()
+    
+    esperar_tecla()
+
+def actualizar_pelicula():
+    """Actualiza los datos de una película existente"""
+    borrar_pantalla()
+    print("\n\t.:: ACTUALIZAR PELÍCULA ::.\n")
+    
+    # Mostrar películas para seleccionar
+    conexion = conectar_bd()
+    if conexion is None:
+        esperar_tecla()
+        return
+    
+    try:
+        cursor = conexion.cursor(dictionary=True)
+        cursor.execute("SELECT id, nombre FROM peliculas")
+        peliculas = cursor.fetchall()
+        
+        if not peliculas:
+            print("No hay películas registradas")
+            esperar_tecla()
+            return
+            
+        print("Películas disponibles:")
+        for peli in peliculas:
+            print(f"{peli['id']} - {peli['nombre']}")
+            
+        id_peli = input("\nIngrese el ID de la película a actualizar: ")
+        if not id_peli.isdigit():
+            print("ID inválido")
+            esperar_tecla()
+            return
+            
+        # Obtener datos actuales
+        cursor.execute("SELECT * FROM peliculas WHERE id = %s", (id_peli,))
+        pelicula = cursor.fetchone()
+        
+        if not pelicula:
+            print("No se encontró la película")
+            esperar_tecla()
+            return
+            
+        print("\nDatos actuales:")
+        for campo, valor in pelicula.items():
+            print(f"{campo}: {valor}")
+            
+        # Solicitar nuevos datos
+        print("\nIngrese los nuevos datos (deje en blanco para mantener el valor actual):")
+        nuevos_datos = {}
+        for campo in ['nombre', 'categoria', 'clasificacion', 'genero', 'idioma']:
+            nuevo_valor = input(f"{campo} ({pelicula[campo]}): ")
+            if nuevo_valor.strip():
+                nuevos_datos[campo] = nuevo_valor.upper()
+                
+        if nuevos_datos:
+            set_clause = ", ".join([f"{k} = %s" for k in nuevos_datos.keys()])
+            valores = list(nuevos_datos.values())
+            valores.append(id_peli)
+            
+            sql = f"UPDATE peliculas SET {set_clause} WHERE id = %s"
+            cursor.execute(sql, valores)
+            conexion.commit()
+            print("\n¡Película actualizada con éxito!")
+        else:
+            print("\nNo se realizaron cambios")
+            
+    except Error as e:
+        print(f"\nError al actualizar: {e}")
+    finally:
+        if conexion.is_connected():
+            cursor.close()
+            conexion.close()
+    
+    esperar_tecla()
+
+def eliminar_pelicula():
+    """Elimina una película de la base de datos"""
+    borrar_pantalla()
+    print("\n\t.:: ELIMINAR PELÍCULA ::.\n")
+    
+    # Verificar contraseña de administrador
+    intento = input("Ingrese la contraseña de administrador: ").strip()
+    if intento != CONTRASENA_ADMIN:
+        print("\nContraseña incorrecta. Acceso denegado.")
+        esperar_tecla()
+        return
+    
+    # Mostrar películas disponibles
+    conexion = conectar_bd()
+    if conexion is None:
+        esperar_tecla()
+        return
+    
+    try:
+        cursor = conexion.cursor(dictionary=True)
+        cursor.execute("SELECT id, nombre FROM peliculas")
+        peliculas = cursor.fetchall()
+        
+        if not peliculas:
+            print("No hay películas registradas")
+            esperar_tecla()
+            return
+            
+        print("Películas disponibles:")
+        for peli in peliculas:
+            print(f"{peli['id']} - {peli['nombre']}")
+            
+        id_peli = input("\nIngrese el ID de la película a eliminar: ")
+        if not id_peli.isdigit():
+            print("ID inválido")
+            esperar_tecla()
+            return
+            
+        confirmacion = input(f"¿Está seguro de eliminar la película {id_peli}? (s/n): ").lower()
+        if confirmacion == 's':
+            cursor.execute("DELETE FROM peliculas WHERE id = %s", (id_peli,))
+            conexion.commit()
+            print("\n¡Película eliminada con éxito!")
+        else:
+            print("\nOperación cancelada")
+            
+    except Error as e:
+        print(f"\nError al eliminar: {e}")
+    finally:
+        if conexion.is_connected():
+            cursor.close()
+            conexion.close()
+    
+    esperar_tecla()
